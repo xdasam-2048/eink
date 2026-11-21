@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>iPhone 墨水屏藍牙傳圖</title>
+<style>
+  body { font-family: -apple-system, sans-serif; background: #121212; color: #fff; text-align: center; padding: 20px; }
+  h2 { margin-bottom: 8px; }
+  p { color: #aaa; font-size: 14px; margin-top: 0; }
+  input, button { font-size: 16px; padding: 14px 16px; margin: 10px 0; border-radius: 12px; border: none; width: 92%; max-width: 400px; }
+  input { background: #2a2a2a; color: #fff; }
+  button { background: #0a84ff; color: #fff; font-weight: bold; }
+  button:disabled { background: #444; color: #888; }
+  canvas { max-width: 92%; border: 2px solid #444; margin-top: 12px; background: #fff; border-radius: 6px; }
+  #status { margin-top: 15px; color: #30d158; font-weight: bold; font-size: 16px; }
+</style>
+</head>
+<body>
+  <h2>🖼️ iPhone 墨水屏藍牙傳圖</h2>
+  <p>專為 5.73 / 5.83 吋黑白屏優化 (648 × 480)</p>
+
+  <input type="file" id="imageInput" accept="image/*">
+  
+  <div>
+    <canvas id="previewCanvas" width="648" height="480"></canvas>
+  </div>
+
+  <button id="sendBtn" onclick="connectAndSend()" disabled>📡 連接藍牙並傳送到墨水屏</button>
+  <div id="status">請先從 iPhone 相簿選擇一張圖片</div>
+
+<script>
+const SERVICE_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
+const CHAR_UUID    = "6e400002-b5a3-f393-e0a9-e50e24dcca9e";
+const W = 648;
+const H = 480;
+let packedData = null;
+
+const canvas = document.getElementById('previewCanvas');
+const ctx = canvas.getContext('2d');
+const statusEl = document.getElementById('status');
+
+document.getElementById('imageInput').addEventListener('change', processImage);
+
+function processImage() {
+  const file = document.getElementById('imageInput').files[0];
+  if (!file) return;
+
+  const img = new Image();
+  img.onload = () => {
+    // 自動等比例縮放並居中填滿 648x480，免手動剪裁
+    const scale = Math.max(W / img.width, H / img.height);
+    const nw = img.width * scale;
+    const nh = img.height * scale;
+    const nx = (W - nw) / 2;
+    const ny = (H - nh) / 2;
+
+    ctx.fillStyle = "#FFFFFF";
+    ctx.fillRect(0, 0, W, H);
+    ctx.drawImage(img, nx, ny, nw, nh);
+
+    // Floyd-Steinberg 黑白網點抖動
+    const imgData = ctx.getImageData(0, 0, W, H);
+    const d = imgData.data;
+    const gray = new Float32Array(W * H);
+
+    for (let i = 0; i < W * H; i++) {
+      gray[i] = 0.299 * d[i*4] + 0.587 * d[i*4+1] + 0.114 * d[i*4+2];
+    }
+
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        const idx = y * W + x;
+        const oldPixel = gray[idx];
+        const newPixel = oldPixel < 128 ? 0 : 255;
+        gray[idx] = newPixel;
+        const err = oldPixel - newPixel;
+
+        if (x + 1 < W) gray[idx + 1] += err * 7 / 16;
+        if (x - 1 >= 0 && y + 1 < H) gray[idx + W - 1] += err * 3 / 16;
+        if (y + 1 < H) gray[idx + W] += err * 5 / 16;
+        if (x + 1 < W && y + 1 < H) gray[idx + W + 1] += err * 1 / 16;
+
+        const cIdx = idx * 4;
+        d[cIdx] = d[cIdx+1] = d[cIdx+2] = newPixel;
+      }
+    }
+    ctx.putImageData(imgData, 0, 0);
+
+    packedData = new Uint8Array((W * H) / 8);
+    for (let i = 0; i < packedData.length; i++) {
+      let byte = 0;
+      for (let bit = 0; bit < 8; bit++) {
+        if (gray[i * 8 + bit] > 128) {
+          byte |= (1 << (7 - bit));
+        }
+      }
+      packedData[i] = byte;
+    }
+
+    document.getElementById('sendBtn').disabled = false;
+    statusEl.innerText = "預覽已生成！點擊下方藍色按鈕傳送";
+  };
+  img.src = URL.createObjectURL(file);
+}
+
+async function connectAndSend() {
+  if (!packedData) return;
+  const btn = document.getElementById('sendBtn');
+  btn.disabled = true;
+
+  try {
+    statusEl.innerText = "正在搜尋 E-Ink_Frame...";
+    const device = await navigator.bluetooth.requestDevice({
+      filters: [{ name: "E-Ink_Frame" }],
+      optionalServices: [SERVICE_UUID]
+    });
+
+    statusEl.innerText = "正在連接 iPhone 藍牙...";
+    const server = await device.gatt.connect();
+    const service = await server.getPrimaryService(SERVICE_UUID);
+    const char = await service.getCharacteristic(CHAR_UUID);
+
+    const encoder = new TextEncoder();
+    await char.writeValueWithoutResponse(encoder.encode("START"));
+    await new Promise(r => setTimeout(r, 120));
+
+    // 針對 iPhone iOS 藍牙 MTU 優化為 180 bytes 每次
+    const CHUNK = 180;
+    for (let i = 0; i < packedData.length; i += CHUNK) {
+      const slice = packedData.slice(i, i + CHUNK);
+      await char.writeValueWithoutResponse(slice);
+      if (i % (CHUNK * 12) === 0) {
+        const pct = Math.round((i / packedData.length) * 100);
+        statusEl.innerText = `傳送中... ${pct}%`;
+        await new Promise(r => setTimeout(r, 25));
+      }
+    }
+
+    await new Promise(r => setTimeout(r, 150));
+    await char.writeValueWithoutResponse(encoder.encode("END"));
+    statusEl.innerText = "✅ 傳送完成！墨水屏正在刷新...";
+    
+    setTimeout(() => { device.gatt.disconnect(); btn.disabled = false; }, 1500);
+  } catch (err) {
+    statusEl.innerText = "❌ 錯誤：" + err.message;
+    btn.disabled = false;
+  }
+}
+</script>
+</body>
+</html>
