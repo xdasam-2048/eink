@@ -8,21 +8,27 @@
   body { font-family: -apple-system, sans-serif; background: #121212; color: #fff; text-align: center; padding: 14px; margin: 0; }
   h2 { margin: 6px 0 4px; font-size: 20px; }
   p { color: #aaa; font-size: 13px; margin: 0 0 10px; }
-  input, button { font-size: 15px; padding: 12px 14px; margin: 6px 0; border-radius: 12px; border: none; width: 92%; max-width: 400px; }
-  input[type="file"] { background: #2a2a2a; color: #fff; }
+  select, input, button { font-size: 15px; padding: 12px 14px; margin: 6px 0; border-radius: 12px; border: none; width: 92%; max-width: 400px; }
+  select, input[type="file"] { background: #2a2a2a; color: #fff; }
   .row { display: flex; justify-content: center; gap: 8px; width: 92%; max-width: 400px; margin: 4px auto; }
   .row button { width: 50%; margin: 0; background: #2c2c2e; color: #fff; font-size: 14px; }
   .slider-box { display: flex; align-items: center; justify-content: center; gap: 10px; width: 92%; max-width: 400px; margin: 6px auto; font-size: 14px; color: #ccc; }
   .slider-box input[type="range"] { flex: 1; padding: 0; margin: 0; }
   #sendBtn { background: #0a84ff; color: #fff; font-weight: bold; font-size: 16px; margin-top: 8px; }
   #sendBtn:disabled { background: #444; color: #888; }
-  canvas { max-width: 92%; max-height: 340px; border: 2px solid #555; margin-top: 8px; background: #fff; border-radius: 6px; touch-action: none; cursor: grab; }
+  canvas { max-width: 92%; max-height: 330px; border: 2px solid #555; margin-top: 8px; background: #fff; border-radius: 6px; touch-action: none; cursor: grab; }
   #status { margin-top: 10px; color: #30d158; font-weight: bold; font-size: 15px; }
 </style>
 </head>
 <body>
   <h2>🖼️ iPhone 墨水屏藍牙傳圖</h2>
-  <p>手指可直接在框內拖拉移動位置，雙指或滑桿縮放</p>
+  <p>選擇螢幕尺寸後，手指可直接在框內拖拉移動及縮放</p>
+
+  <select id="screenSelect" onchange="changeScreen()">
+    <option value="648x480">5.73 / 5.83 吋 黑白屏 (648 × 480)</option>
+    <option value="800x480">7.5 吋 新版黑白屏 (800 × 480)</option>
+    <option value="640x384">7.5 吋 老款黑白屏 (640 × 384)</option>
+  </select>
 
   <input type="file" id="imageInput" accept="image/*">
 
@@ -42,12 +48,13 @@
   </div>
 
   <button id="sendBtn" onclick="connectAndSend()" disabled>📡 連接藍牙並傳送到墨水屏</button>
-  <div id="status">請先從 iPhone 相簿選擇一張圖片</div>
+  <div id="status">請先選擇螢幕型號及從相簿挑選圖片</div>
 
 <script>
 const SERVICE_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
 const CHAR_UUID    = "6e400002-b5a3-f393-e0a9-e50e24dcca9e";
 
+let hwW = 648, hwH = 480;
 let isPortrait = false;
 let imgAngle = 0;
 let offsetX = 0, offsetY = 0;
@@ -64,6 +71,21 @@ const canvas = document.getElementById('previewCanvas');
 const ctx = canvas.getContext('2d');
 const statusEl = document.getElementById('status');
 const zoomSlider = document.getElementById('zoomSlider');
+
+function changeScreen() {
+  const [w, h] = document.getElementById('screenSelect').value.split('x').map(Number);
+  hwW = w;
+  hwH = h;
+  offsetX = 0;
+  offsetY = 0;
+  if (currentImg) {
+    renderPreview(true);
+  } else {
+    canvas.width = isPortrait ? hwH : hwW;
+    canvas.height = isPortrait ? hwW : hwH;
+    statusEl.innerText = `已切換螢幕規格：${hwW} × ${hwH}`;
+  }
+}
 
 document.getElementById('imageInput').addEventListener('change', (e) => {
   const file = e.target.files[0];
@@ -100,9 +122,9 @@ function toggleMode() {
   if (currentImg) {
     renderPreview(true);
   } else {
-    canvas.width = isPortrait ? 480 : 648;
-    canvas.height = isPortrait ? 648 : 480;
-    statusEl.innerText = isPortrait ? "已切換為：直向模式 (480×648)" : "已切換為：橫向模式 (648×480)";
+    canvas.width = isPortrait ? hwH : hwW;
+    canvas.height = isPortrait ? hwW : hwH;
+    statusEl.innerText = isPortrait ? `已切換為直向 (${hwH}×${hwW})` : `已切換為橫向 (${hwW}×${hwH})`;
   }
 }
 
@@ -185,8 +207,8 @@ window.addEventListener('mouseup', () => {
 });
 
 function renderPreview(applyDither) {
-  const viewW = isPortrait ? 480 : 648;
-  const viewH = isPortrait ? 648 : 480;
+  const viewW = isPortrait ? hwH : hwW;
+  const viewH = isPortrait ? hwW : hwH;
   canvas.width = viewW;
   canvas.height = viewH;
 
@@ -239,29 +261,28 @@ function renderPreview(applyDither) {
   }
   ctx.putImageData(imgData, 0, 0);
 
-  const HW_W = 648, HW_H = 480;
-  packedData = new Uint8Array((HW_W * HW_H) / 8);
+  packedData = new Uint8Array((hwW * hwH) / 8);
 
-  for (let hy = 0; hy < HW_H; hy++) {
-    for (let hx = 0; hx < HW_W; hx++) {
+  for (let hy = 0; hy < hwH; hy++) {
+    for (let hx = 0; hx < hwW; hx++) {
       let vx, vy;
       if (!isPortrait) {
         vx = hx;
         vy = hy;
       } else {
         vx = hy;
-        vy = (HW_W - 1) - hx;
+        vy = (hwW - 1) - hx;
       }
       const isWhite = gray[vy * viewW + vx] > 128;
       if (isWhite) {
-        const bitIdx = hy * HW_W + hx;
+        const bitIdx = hy * hwW + hx;
         packedData[bitIdx >> 3] |= (1 << (7 - (bitIdx & 7)));
       }
     }
   }
 
   document.getElementById('sendBtn').disabled = false;
-  statusEl.innerText = "構圖已更新！點擊下方藍色按鈕傳送";
+  statusEl.innerText = `構圖已就緒 (${hwW}×${hwH})！點擊下方按鈕傳送`;
 }
 
 async function connectAndSend() {
@@ -289,24 +310,3 @@ async function connectAndSend() {
     for (let i = 0; i < packedData.length; i += CHUNK) {
       const slice = packedData.slice(i, i + CHUNK);
       await char.writeValueWithoutResponse(slice);
-      await new Promise(r => setTimeout(r, 22));
-
-      if (i % (CHUNK * 10) === 0) {
-        const pct = Math.round((i / packedData.length) * 100);
-        statusEl.innerText = `穩定傳送中... ${pct}%`;
-      }
-    }
-
-    await new Promise(r => setTimeout(r, 200));
-    await char.writeValueWithResponse(encoder.encode("END"));
-    statusEl.innerText = "✅ 傳送完成！墨水屏正在清屏並刷新...";
-    
-    setTimeout(() => { device.gatt.disconnect(); btn.disabled = false; }, 2000);
-  } catch (err) {
-    statusEl.innerText = "❌ 錯誤：" + err.message;
-    btn.disabled = false;
-  }
-}
-</script>
-</body>
-</html>
