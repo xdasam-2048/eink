@@ -8,7 +8,7 @@
   body { font-family: -apple-system, sans-serif; background: #121212; color: #fff; text-align: center; padding: 14px; margin: 0; }
   h2 { margin: 6px 0 4px; font-size: 20px; }
   p { color: #aaa; font-size: 13px; margin: 0 0 10px; }
-  select, input, button { font-size: 15px; padding: 12px 14px; margin: 6px 0; border-radius: 12px; border: none; width: 92%; max-width: 400px; }
+  select, input, button { font-size: 15px; padding: 12px 14px; margin: 5px 0; border-radius: 12px; border: none; width: 92%; max-width: 400px; }
   select, input[type="file"] { background: #2a2a2a; color: #fff; }
   .row { display: flex; justify-content: center; gap: 8px; width: 92%; max-width: 400px; margin: 4px auto; }
   .row button { width: 50%; margin: 0; background: #2c2c2e; color: #fff; font-size: 14px; }
@@ -16,18 +16,24 @@
   .slider-box input[type="range"] { flex: 1; padding: 0; margin: 0; }
   #sendBtn { background: #0a84ff; color: #fff; font-weight: bold; font-size: 16px; margin-top: 8px; }
   #sendBtn:disabled { background: #444; color: #888; }
-  canvas { max-width: 92%; max-height: 330px; border: 2px solid #555; margin-top: 8px; background: #fff; border-radius: 6px; touch-action: none; cursor: grab; }
+  canvas { max-width: 92%; max-height: 310px; border: 2px solid #555; margin-top: 8px; background: #fff; border-radius: 6px; touch-action: none; cursor: grab; }
   #status { margin-top: 10px; color: #30d158; font-weight: bold; font-size: 15px; }
 </style>
 </head>
 <body>
   <h2>🖼️ iPhone 墨水屏藍牙傳圖</h2>
-  <p>選擇螢幕尺寸後，手指可直接在框內拖拉移動及縮放</p>
+  <p>可自由選擇螢幕尺寸及「純黑白 / 三色」輸出</p>
 
-  <select id="screenSelect" onchange="changeScreen()">
-    <option value="648x480">5.73 / 5.83 吋 黑白屏 (648 × 480)</option>
-    <option value="800x480">7.5 吋 新版黑白屏 (800 × 480)</option>
-    <option value="640x384">7.5 吋 老款黑白屏 (640 × 384)</option>
+  <select id="screenSelect" onchange="changeConfig()">
+    <option value="800x480">7.5 / 7.4 吋 大屏 (800 × 480)</option>
+    <option value="640x384">7.5 吋 老款屏 (640 × 384)</option>
+    <option value="648x480">5.73 / 5.83 吋 屏 (648 × 480)</option>
+    <option value="400x300">4.2 吋 屏 HINK-E042A13 (400 × 300)</option>
+  </select>
+
+  <select id="colorSelect" onchange="changeConfig()">
+    <option value="BW">⚫⚪ 純黑白輸出 (速度快、適合相片)</option>
+    <option value="3C">⚫⚪🔴 三色輸出 黑白紅 (有紅色層)</option>
   </select>
 
   <input type="file" id="imageInput" accept="image/*">
@@ -44,17 +50,18 @@
   </div>
   
   <div>
-    <canvas id="previewCanvas" width="648" height="480"></canvas>
+    <canvas id="previewCanvas" width="800" height="480"></canvas>
   </div>
 
   <button id="sendBtn" onclick="connectAndSend()" disabled>📡 連接藍牙並傳送到墨水屏</button>
-  <div id="status">請先選擇螢幕型號及從相簿挑選圖片</div>
+  <div id="status">請先選擇規格並從相簿挑選圖片</div>
 
 <script>
 const SERVICE_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
 const CHAR_UUID    = "6e400002-b5a3-f393-e0a9-e50e24dcca9e";
 
-let hwW = 648, hwH = 480, isPortrait = false, imgAngle = 0;
+let hwW = 800, hwH = 480, colorMode = "BW";
+let isPortrait = false, imgAngle = 0;
 let offsetX = 0, offsetY = 0, zoomFactor = 1.0;
 let currentImg = null, packedData = null;
 let isDragging = false, lastX = 0, lastY = 0, initialPinchDist = 0, initialZoom = 1.0;
@@ -64,14 +71,15 @@ const ctx = canvas.getContext('2d');
 const statusEl = document.getElementById('status');
 const zoomSlider = document.getElementById('zoomSlider');
 
-function changeScreen() {
+function changeConfig() {
   const [w, h] = document.getElementById('screenSelect').value.split('x').map(Number);
+  colorMode = document.getElementById('colorSelect').value;
   hwW = w; hwH = h; offsetX = 0; offsetY = 0;
   if (currentImg) { renderPreview(true); }
   else {
     canvas.width = isPortrait ? hwH : hwW;
     canvas.height = isPortrait ? hwW : hwH;
-    statusEl.innerText = `已切換螢幕規格：${hwW} × ${hwH}`;
+    statusEl.innerText = `已設定：${hwW}×${hwH} (${colorMode === '3C' ? '黑白紅三色' : '純黑白'})`;
   }
 }
 
@@ -94,7 +102,6 @@ function toggleMode() {
   else {
     canvas.width = isPortrait ? hwH : hwW;
     canvas.height = isPortrait ? hwW : hwH;
-    statusEl.innerText = isPortrait ? `已切換為直向 (${hwH}×${hwW})` : `已切換為橫向 (${hwW}×${hwH})`;
   }
 }
 
@@ -136,6 +143,21 @@ window.addEventListener('mousemove', (e) => {
 });
 window.addEventListener('mouseup', () => { if (isDragging && currentImg) { isDragging = false; renderPreview(true); } });
 
+// 最近顏色匹配 (0=黑, 1=白, 2=紅)
+const PAL_BW = [[0,0,0], [255,255,255]];
+const PAL_3C = [[0,0,0], [255,255,255], [210,20,20]];
+
+function nearestColor(r, g, b, pal) {
+  let best = 0, minD = 1e9;
+  for (let i = 0; i < pal.length; i++) {
+    const dr = r - pal[i][0], dg = g - pal[i][1], db = b - pal[i][2];
+    // 加重紅色靈敏度，令三色效果更鮮明
+    const d = (i === 2) ? (dr*dr*0.8 + dg*dg*1.2 + db*db*1.2) : (dr*dr + dg*dg + db*db);
+    if (d < minD) { minD = d; best = i; }
+  }
+  return best;
+}
+
 function renderPreview(applyDither) {
   const viewW = isPortrait ? hwH : hwW, viewH = isPortrait ? hwW : hwH;
   canvas.width = viewW; canvas.height = viewH;
@@ -153,66 +175,53 @@ function renderPreview(applyDither) {
 
   if (!applyDither) return;
 
-  const imgData = ctx.getImageData(0, 0, viewW, viewH), d = imgData.data, gray = new Float32Array(viewW * viewH);
-  for (let i = 0; i < viewW * viewH; i++) gray[i] = 0.299 * d[i*4] + 0.587 * d[i*4+1] + 0.114 * d[i*4+2];
+  const imgData = ctx.getImageData(0, 0, viewW, viewH), d = imgData.data;
+  const buf = new Float32Array(viewW * viewH * 3);
+  for (let i = 0; i < viewW * viewH; i++) {
+    if (colorMode === "BW") {
+      const g = 0.299 * d[i*4] + 0.587 * d[i*4+1] + 0.114 * d[i*4+2];
+      buf[i*3] = buf[i*3+1] = buf[i*3+2] = g;
+    } else {
+      buf[i*3] = d[i*4]; buf[i*3+1] = d[i*4+1]; buf[i*3+2] = d[i*4+2];
+    }
+  }
+
+  const pal = (colorMode === "3C") ? PAL_3C : PAL_BW;
+  const clsMap = new Uint8Array(viewW * viewH);
 
   for (let y = 0; y < viewH; y++) {
     for (let x = 0; x < viewW; x++) {
-      const idx = y * viewW + x, oldPixel = gray[idx], newPixel = oldPixel < 128 ? 0 : 255;
-      gray[idx] = newPixel; const err = oldPixel - newPixel;
-      if (x + 1 < viewW) gray[idx + 1] += err * 7 / 16;
-      if (x - 1 >= 0 && y + 1 < viewH) gray[idx + viewW - 1] += err * 3 / 16;
-      if (y + 1 < viewH) gray[idx + viewW] += err * 5 / 16;
-      if (x + 1 < viewW && y + 1 < viewH) gray[idx + viewW + 1] += err / 16;
-      const cIdx = idx * 4; d[cIdx] = d[cIdx+1] = d[cIdx+2] = newPixel;
+      const idx = y * viewW + x, p3 = idx * 3;
+      const or = buf[p3], og = buf[p3+1], ob = buf[p3+2];
+      const ci = nearestColor(or, og, ob, pal);
+      clsMap[idx] = ci;
+      const nr = pal[ci][0], ng = pal[ci][1], nb = pal[ci][2];
+      const er = or - nr, eg = og - ng, eb = ob - nb;
+
+      const spread = (dx, dy, w) => {
+        const nx = x + dx, ny = y + dy;
+        if (nx >= 0 && nx < viewW && ny < viewH) {
+          const ni = (ny * viewW + nx) * 3;
+          buf[ni] += er * w; buf[ni+1] += eg * w; buf[ni+2] += eb * w;
+        }
+      };
+      spread(1, 0, 7/16); spread(-1, 1, 3/16); spread(0, 1, 5/16); spread(1, 1, 1/16);
+
+      const cIdx = idx * 4; d[cIdx] = nr; d[cIdx+1] = ng; d[cIdx+2] = nb;
     }
   }
   ctx.putImageData(imgData, 0, 0);
 
-  packedData = new Uint8Array((hwW * hwH) / 8);
+  const planeBytes = (hwW * hwH) / 8;
+  packedData = new Uint8Array(colorMode === "3C" ? planeBytes * 2 : planeBytes);
+
   for (let hy = 0; hy < hwH; hy++) {
     for (let hx = 0; hx < hwW; hx++) {
       const vx = isPortrait ? hy : hx, vy = isPortrait ? (hwW - 1) - hx : hy;
-      if (gray[vy * viewW + vx] > 128) {
-        const bitIdx = hy * hwW + hx;
-        packedData[bitIdx >> 3] |= (1 << (7 - (bitIdx & 7)));
-      }
-    }
-  }
-  document.getElementById('sendBtn').disabled = false;
-  statusEl.innerText = `構圖已就緒 (${hwW}×${hwH})！點擊下方按鈕傳送`;
-}
-
-async function connectAndSend() {
-  if (!packedData) return;
-  const btn = document.getElementById('sendBtn'); btn.disabled = true;
-  try {
-    statusEl.innerText = "正在搜尋 E-Ink_Frame...";
-    const device = await navigator.bluetooth.requestDevice({ filters: [{ name: "E-Ink_Frame" }], optionalServices: [SERVICE_UUID] });
-    statusEl.innerText = "正在連接 iPhone 藍牙...";
-    const server = await device.gatt.connect();
-    const service = await server.getPrimaryService(SERVICE_UUID);
-    const char = await service.getCharacteristic(CHAR_UUID);
-    const encoder = new TextEncoder();
-    await char.writeValueWithResponse(encoder.encode("START"));
-    await new Promise(r => setTimeout(r, 150));
-
-    const CHUNK = 160;
-    for (let i = 0; i < packedData.length; i += CHUNK) {
-      await char.writeValueWithoutResponse(packedData.slice(i, i + CHUNK));
-      await new Promise(r => setTimeout(r, 22));
-      if (i % (CHUNK * 10) === 0) statusEl.innerText = `穩定傳送中... ${Math.round((i / packedData.length) * 100)}%`;
-    }
-
-    await new Promise(r => setTimeout(r, 200));
-    await char.writeValueWithResponse(encoder.encode("END"));
-    statusEl.innerText = "✅ 傳送完成！墨水屏正在清屏並刷新...";
-    setTimeout(() => { device.gatt.disconnect(); btn.disabled = false; }, 2000);
-  } catch (err) {
-    statusEl.innerText = "❌ 錯誤：" + err.message;
-    btn.disabled = false;
-  }
-}
-</script>
-</body>
-</html>
+      const c = clsMap[vy * viewW + vx]; // 0=黑, 1=白, 2=紅
+      const bitIdx = hy * hwW + hx;
+      // 第一層 (黑白層): 白色或紅色位置設為 1 (不畫黑點)，黑色設為 0
+      if (c !== 0) packedData[bitIdx >> 3] |= (1 << (7 - (bitIdx & 7)));
+      // 第二層 (紅色層，僅 3C 模式): 紅色設為 1，其他設為 0
+      if (colorMode === "3C" && c === 2) {
+        packedData[planeBytes + (bitIdx >> 3)] |= (1 << (7 - (bitIdx & 7)));
