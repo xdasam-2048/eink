@@ -57,23 +57,23 @@
   <div id="status">請先選擇規格並從相簿挑選圖片</div>
 
 <script>
-const SERVICE_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
-const CHAR_UUID    = "6e400002-b5a3-f393-e0a9-e50e24dcca9e";
+var SERVICE_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
+var CHAR_UUID    = "6e400002-b5a3-f393-e0a9-e50e24dcca9e";
 
-let hwW = 800, hwH = 480, colorMode = "BW";
-let isPortrait = false, imgAngle = 0;
-let offsetX = 0, offsetY = 0, zoomFactor = 1.0;
-let currentImg = null, packedData = null;
-let isDragging = false, lastX = 0, lastY = 0, initialPinchDist = 0, initialZoom = 1.0;
+var hwW = 800, hwH = 480, colorMode = "BW";
+var isPortrait = false, imgAngle = 0;
+var offsetX = 0, offsetY = 0, zoomFactor = 1.0;
+var currentImg = null, packedData = null;
+var isDragging = false, lastX = 0, lastY = 0, initialPinchDist = 0, initialZoom = 1.0;
 
-const canvas = document.getElementById('previewCanvas');
-const ctx = canvas.getContext('2d');
-const statusEl = document.getElementById('status');
-const zoomSlider = document.getElementById('zoomSlider');
+var canvas = document.getElementById('previewCanvas');
+var ctx = canvas.getContext('2d');
+var statusEl = document.getElementById('status');
+var zoomSlider = document.getElementById('zoomSlider');
 
 function changeConfig() {
-  const val = document.getElementById('screenSelect').value;
-  const xPos = val.indexOf('x');
+  var val = document.getElementById('screenSelect').value;
+  var xPos = val.indexOf('x');
   hwW = Number(val.slice(0, xPos));
   hwH = Number(val.slice(xPos + 1));
   colorMode = document.getElementById('colorSelect').value;
@@ -87,10 +87,10 @@ function changeConfig() {
 }
 
 document.getElementById('imageInput').addEventListener('change', function(e) {
-  const file = e.target.files.item(0);
+  var file = e.target.files.item(0);
   if (!file) return;
   statusEl.innerText = "正在處理圖片...";
-  const img = new Image();
+  var img = new Image();
   img.onload = function() { currentImg = img; imgAngle = 0; resetTransform(); };
   img.src = URL.createObjectURL(file);
 });
@@ -114,10 +114,10 @@ function rotateImg() { imgAngle = (imgAngle + 90) % 360; offsetX = 0; offsetY = 
 canvas.addEventListener('touchstart', function(e) {
   if (!currentImg) return; e.preventDefault();
   if (e.touches.length === 1) {
-    const t0 = e.touches.item(0);
+    var t0 = e.touches.item(0);
     isDragging = true; lastX = t0.clientX; lastY = t0.clientY;
   } else if (e.touches.length === 2) {
-    const t0 = e.touches.item(0), t1 = e.touches.item(1);
+    var t0 = e.touches.item(0), t1 = e.touches.item(1);
     isDragging = false;
     initialPinchDist = Math.hypot(t0.clientX - t1.clientX, t0.clientY - t1.clientY);
     initialZoom = zoomFactor;
@@ -126,16 +126,16 @@ canvas.addEventListener('touchstart', function(e) {
 
 canvas.addEventListener('touchmove', function(e) {
   if (!currentImg) return; e.preventDefault();
-  const scaleRatio = canvas.width / canvas.getBoundingClientRect().width;
+  var scaleRatio = canvas.width / canvas.getBoundingClientRect().width;
   if (e.touches.length === 1 && isDragging) {
-    const t0 = e.touches.item(0);
+    var t0 = e.touches.item(0);
     offsetX += (t0.clientX - lastX) * scaleRatio;
     offsetY += (t0.clientY - lastY) * scaleRatio;
     lastX = t0.clientX; lastY = t0.clientY;
     renderPreview(false);
   } else if (e.touches.length === 2) {
-    const t0 = e.touches.item(0), t1 = e.touches.item(1);
-    const dist = Math.hypot(t0.clientX - t1.clientX, t0.clientY - t1.clientY);
+    var t0 = e.touches.item(0), t1 = e.touches.item(1);
+    var dist = Math.hypot(t0.clientX - t1.clientX, t0.clientY - t1.clientY);
     zoomFactor = Math.min(3.0, Math.max(0.5, initialZoom * (dist / initialPinchDist)));
     zoomSlider.value = zoomFactor.toFixed(2);
     renderPreview(false);
@@ -146,30 +146,30 @@ canvas.addEventListener('touchend', function() { if (currentImg) { isDragging = 
 canvas.addEventListener('mousedown', function(e) { if (currentImg) { isDragging = true; lastX = e.clientX; lastY = e.clientY; } });
 window.addEventListener('mousemove', function(e) {
   if (!isDragging || !currentImg) return;
-  const scaleRatio = canvas.width / canvas.getBoundingClientRect().width;
+  var scaleRatio = canvas.width / canvas.getBoundingClientRect().width;
   offsetX += (e.clientX - lastX) * scaleRatio; offsetY += (e.clientY - lastY) * scaleRatio;
   lastX = e.clientX; lastY = e.clientY; renderPreview(false);
 });
 window.addEventListener('mouseup', function() { if (isDragging && currentImg) { isDragging = false; renderPreview(true); } });
 
 function matchColor(r, g, b, is3C) {
-  // 0=黑(0,0,0), 1=白(255,255,255), 2=紅(220,20,20)
-  const d0 = r*r + g*g + b*b;
-  const d1 = (r-255)*(r-255) + (g-255)*(g-255) + (b-255)*(b-255);
+  var d0 = r*r + g*g + b*b;
+  var d1 = (r-255)*(r-255) + (g-255)*(g-255) + (b-255)*(b-255);
   if (!is3C) return (d0 < d1) ? 0 : 1;
-  const d2 = (r-220)*(r-220)*0.8 + (g-20)*(g-20)*1.2 + (b-20)*(b-20)*1.2;
+  var d2 = (r-220)*(r-220)*0.8 + (g-20)*(g-20)*1.2 + (b-20)*(b-20)*1.2;
   if (d2 < d0 && d2 < d1) return 2;
   return (d0 < d1) ? 0 : 1;
 }
 
 function renderPreview(applyDither) {
-  const viewW = isPortrait ? hwH : hwW, viewH = isPortrait ? hwW : hwH;
+  changeConfigSync();
+  var viewW = isPortrait ? hwH : hwW, viewH = isPortrait ? hwW : hwH;
   canvas.width = viewW; canvas.height = viewH;
   ctx.fillStyle = "#FFFFFF"; ctx.fillRect(0, 0, viewW, viewH);
 
-  const rotW = (imgAngle % 180 === 0) ? currentImg.width : currentImg.height;
-  const rotH = (imgAngle % 180 === 0) ? currentImg.height : currentImg.width;
-  const finalScale = Math.max(viewW / rotW, viewH / rotH) * zoomFactor;
+  var rotW = (imgAngle % 180 === 0) ? currentImg.width : currentImg.height;
+  var rotH = (imgAngle % 180 === 0) ? currentImg.height : currentImg.width;
+  var finalScale = Math.max(viewW / rotW, viewH / rotH) * zoomFactor;
 
   ctx.save();
   ctx.translate(viewW / 2 + offsetX, viewH / 2 + offsetY);
@@ -179,86 +179,107 @@ function renderPreview(applyDither) {
 
   if (!applyDither) return;
 
-  const is3C = (colorMode === "3C");
-  const imgData = ctx.getImageData(0, 0, viewW, viewH), d = imgData.data;
-  const buf = new Float32Array(viewW * viewH * 3);
-  for (let i = 0; i < viewW * viewH; i++) {
-    const p4 = i * 4, p3 = i * 3;
+  var is3C = (colorMode === "3C");
+  var imgData = ctx.getImageData(0, 0, viewW, viewH), d = imgData.data;
+  var totalPx = viewW * viewH;
+  var bufR = new Float32Array(totalPx);
+  var bufG = new Float32Array(totalPx);
+  var bufB = new Float32Array(totalPx);
+
+  var dv = new DataView(d.buffer);
+  for (var i = 0; i < totalPx; i++) {
+    var p4 = i * 4;
+    var r = dv.getUint8(p4), g = dv.getUint8(p4+1), b = dv.getUint8(p4+2);
     if (!is3C) {
-      const g = 0.299 * d.at(p4) + 0.587 * d.at(p4+1) + 0.114 * d.at(p4+2);
-      buf.set(Float32Array.of(g, g, g), p3);
+      var gray = 0.299 * r + 0.587 * g + 0.114 * b;
+      bufR.subarray(i, i+1).fill(gray);
+      bufG.subarray(i, i+1).fill(gray);
+      bufB.subarray(i, i+1).fill(gray);
     } else {
-      buf.set(Float32Array.of(d.at(p4), d.at(p4+1), d.at(p4+2)), p3);
+      bufR.subarray(i, i+1).fill(r);
+      bufG.subarray(i, i+1).fill(g);
+      bufB.subarray(i, i+1).fill(b);
     }
   }
 
-  const clsMap = new Uint8Array(viewW * viewH);
-  const spread = function(nx, ny, er, eg, eb, w) {
+  var clsMap = new Uint8Array(totalPx);
+  var vR = new DataView(bufR.buffer), vG = new DataView(bufG.buffer), vB = new DataView(bufB.buffer);
+  var vCls = new DataView(clsMap.buffer);
+
+  var spread = function(nx, ny, er, eg, eb, w) {
     if (nx >= 0 && nx < viewW && ny < viewH) {
-      const ni = (ny * viewW + nx) * 3;
-      buf.set(Float32Array.of(buf.at(ni) + er*w, buf.at(ni+1) + eg*w, buf.at(ni+2) + eb*w), ni);
+      var off = (ny * viewW + nx) * 4;
+      vR.setFloat32(off, vR.getFloat32(off, true) + er*w, true);
+      vG.setFloat32(off, vG.getFloat32(off, true) + eg*w, true);
+      vB.setFloat32(off, vB.getFloat32(off, true) + eb*w, true);
     }
   };
 
-  for (let y = 0; y < viewH; y++) {
-    for (let x = 0; x < viewW; x++) {
-      const idx = y * viewW + x, p3 = idx * 3;
-      const or = buf.at(p3), og = buf.at(p3+1), ob = buf.at(p3+2);
-      const ci = matchColor(or, og, ob, is3C);
-      clsMap.set(Uint8Array.of(ci), idx);
-      const nr = (ci === 1) ? 255 : (ci === 2 ? 220 : 0);
-      const ng = (ci === 1) ? 255 : (ci === 2 ? 20 : 0);
-      const nb = (ci === 1) ? 255 : (ci === 2 ? 20 : 0);
-      const er = or - nr, eg = og - ng, eb = ob - nb;
+  for (var y = 0; y < viewH; y++) {
+    for (var x = 0; x < viewW; x++) {
+      var idx = y * viewW + x, off = idx * 4;
+      var or = vR.getFloat32(off, true), og = vG.getFloat32(off, true), ob = vB.getFloat32(off, true);
+      var ci = matchColor(or, og, ob, is3C);
+      vCls.setUint8(idx, ci);
+      var nr = (ci === 1) ? 255 : (ci === 2 ? 220 : 0);
+      var ng = (ci === 1) ? 255 : (ci === 2 ? 20 : 0);
+      var nb = (ci === 1) ? 255 : (ci === 2 ? 20 : 0);
+      var er = or - nr, eg = og - ng, eb = ob - nb;
 
       spread(x+1, y, er, eg, eb, 7/16);
       spread(x-1, y+1, er, eg, eb, 3/16);
       spread(x, y+1, er, eg, eb, 5/16);
       spread(x+1, y+1, er, eg, eb, 1/16);
 
-      d.set(Uint8ClampedArray.of(nr, ng, nb, 255), idx * 4);
-    }
-  }
-  ctx.putImageData(imgData, 0, 0);
-
-  const planeBytes = (hwW * hwH) / 8;
-  packedData = new Uint8Array(is3C ? planeBytes * 2 : planeBytes);
-
-  for (let hy = 0; hy < hwH; hy++) {
-    for (let hx = 0; hx < hwW; hx++) {
-      const vx = isPortrait ? hy : hx, vy = isPortrait ? (hwW - 1) - hx : hy;
-      const c = clsMap.at(vy * viewW + vx);
-      const bitIdx = hy * hwW + hx;
-      const bytePos = bitIdx >> 3;
-const bitMask = 1 << (7 - (bitIdx & 7));
-if (c !== 0) packedData.set(Uint8Array.of(packedData.at(bytePos) | bitMask), bytePos);
+dv.setUint8(off, nr); dv.setUint8(off+1, ng); dv.setUint8(off+2, nb); dv.setUint8(off+3, 255);
+}
+}
+ctx.putImageData(imgData, 0, 0);
+var planeBytes = (hwW * hwH) / 8;
+packedData = new Uint8Array(is3C ? planeBytes * 2 : planeBytes);
+var vPk = new DataView(packedData.buffer);
+for (var hy = 0; hy < hwH; hy++) {
+for (var hx = 0; hx < hwW; hx++) {
+var vx = isPortrait ? hy : hx, vy = isPortrait ? (hwW - 1) - hx : hy;
+var c = vCls.getUint8(vy * viewW + vx);
+var bitIdx = hy * hwW + hx;
+var bytePos = bitIdx >> 3;
+var bitMask = 1 << (7 - (bitIdx & 7));
+if (c !== 0) vPk.setUint8(bytePos, vPk.getUint8(bytePos) | bitMask);
 if (is3C && c === 2) {
-const rPos = planeBytes + bytePos;
-packedData.set(Uint8Array.of(packedData.at(rPos) | bitMask), rPos);
+var rPos = planeBytes + bytePos;
+vPk.setUint8(rPos, vPk.getUint8(rPos) | bitMask);
 }
 }
 }
 document.getElementById('sendBtn').disabled = false;
 statusEl.innerText = "就緒：" + hwW + "×" + hwH + " (" + (is3C ? "三色模式" : "黑白模式") + ")";
 }
+function changeConfigSync() {
+var val = document.getElementById('screenSelect').value;
+var xPos = val.indexOf('x');
+hwW = Number(val.slice(0, xPos));
+hwH = Number(val.slice(xPos + 1));
+colorMode = document.getElementById('colorSelect').value;
+}
 async function connectAndSend() {
 if (!packedData) return;
-const btn = document.getElementById('sendBtn'); btn.disabled = true;
+var btn = document.getElementById('sendBtn'); btn.disabled = true;
 try {
 statusEl.innerText = "正在搜尋 E-Ink_Frame...";
-const device = await navigator.bluetooth.requestDevice({
-filters: Array.of({ name: "E-Ink_Frame" }),
-optionalServices: Array.of(SERVICE_UUID)
-});
+var filterObj = { name: "E-Ink_Frame" };
+var filtersList = new Array(1); filtersList.fill(filterObj);
+var svcList = new Array(1); svcList.fill(SERVICE_UUID);
+var device = await navigator.bluetooth.requestDevice({ filters: filtersList, optionalServices: svcList });
 statusEl.innerText = "正在連接 iPhone 藍牙...";
-const server = await device.gatt.connect();
-const service = await server.getPrimaryService(SERVICE_UUID);
-const char = await service.getCharacteristic(CHAR_UUID);
-const encoder = new TextEncoder();
+var server = await device.gatt.connect();
+var service = await server.getPrimaryService(SERVICE_UUID);
+var char = await service.getCharacteristic(CHAR_UUID);
+var encoder = new TextEncoder();
 await char.writeValueWithResponse(encoder.encode("START"));
 await new Promise(function(r) { setTimeout(r, 150); });
-const CHUNK = 160;
-for (let i = 0; i < packedData.length; i += CHUNK) {
+var CHUNK = 160;
+for (var i = 0; i < packedData.length; i += CHUNK) {
 await char.writeValueWithoutResponse(packedData.slice(i, i + CHUNK));
 await new Promise(function(r) { setTimeout(r, 22); });
 if (i % (CHUNK * 12) === 0) statusEl.innerText = "穩定傳送中... " + Math.round((i / packedData.length) * 100) + "%";
