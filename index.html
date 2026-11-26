@@ -8,32 +8,26 @@
   body { font-family: -apple-system, sans-serif; background: #121212; color: #fff; text-align: center; padding: 14px; margin: 0; }
   h2 { margin: 6px 0 4px; font-size: 20px; }
   p { color: #aaa; font-size: 13px; margin: 0 0 10px; }
-  select, input, button { font-size: 15px; padding: 12px 14px; margin: 5px 0; border-radius: 12px; border: none; width: 92%; max-width: 400px; }
-  select, input { background: #2a2a2a; color: #fff; }
+  select, input, button { font-size: 15px; padding: 12px 14px; margin: 6px 0; border-radius: 12px; border: none; width: 92%; max-width: 400px; }
+  select, input[type="file"] { background: #2a2a2a; color: #fff; }
   .row { display: flex; justify-content: center; gap: 8px; width: 92%; max-width: 400px; margin: 4px auto; }
   .row button { width: 50%; margin: 0; background: #2c2c2e; color: #fff; font-size: 14px; }
   .slider-box { display: flex; align-items: center; justify-content: center; gap: 10px; width: 92%; max-width: 400px; margin: 6px auto; font-size: 14px; color: #ccc; }
-  .slider-box input { flex: 1; padding: 0; margin: 0; }
+  .slider-box input[type="range"] { flex: 1; padding: 0; margin: 0; }
   #sendBtn { background: #0a84ff; color: #fff; font-weight: bold; font-size: 16px; margin-top: 8px; }
   #sendBtn:disabled { background: #444; color: #888; }
-  canvas { max-width: 92%; max-height: 310px; border: 2px solid #555; margin-top: 8px; background: #fff; border-radius: 6px; touch-action: none; }
+  canvas { max-width: 92%; max-height: 330px; border: 2px solid #555; margin-top: 8px; background: #fff; border-radius: 6px; touch-action: none; cursor: grab; }
   #status { margin-top: 10px; color: #30d158; font-weight: bold; font-size: 15px; }
 </style>
 </head>
 <body>
   <h2>🖼️ iPhone 墨水屏藍牙傳圖</h2>
-  <p>可自由選擇螢幕尺寸及「純黑白 / 三色」輸出</p>
+  <p>選擇螢幕尺寸後，手指可直接在框內拖拉移動及縮放</p>
 
-  <select id="screenSelect" onchange="changeConfig()">
-    <option value="800x480">7.5 / 7.4 吋 大屏 (800 × 480)</option>
-    <option value="640x384">7.5 吋 老款屏 (640 × 384)</option>
-    <option value="648x480">5.73 / 5.83 吋 屏 (648 × 480)</option>
-    <option value="400x300">4.2 吋 屏 HINK-E042A13 (400 × 300)</option>
-  </select>
-
-  <select id="colorSelect" onchange="changeConfig()">
-    <option value="BW">⚫⚪ 純黑白輸出 (速度快、適合相片)</option>
-    <option value="3C">⚫⚪🔴 三色輸出 黑白紅 (有紅色層)</option>
+  <select id="screenSelect" onchange="changeScreen()">
+    <option value="648x480">5.73 / 5.83 吋 黑白屏 (648 × 480)</option>
+    <option value="800x480">7.5 吋 新版黑白屏 (800 × 480)</option>
+    <option value="640x384">7.5 吋 老款黑白屏 (640 × 384)</option>
   </select>
 
   <input type="file" id="imageInput" accept="image/*">
@@ -50,53 +44,47 @@
   </div>
   
   <div>
-    <canvas id="previewCanvas" width="800" height="480"></canvas>
+    <canvas id="previewCanvas" width="648" height="480"></canvas>
   </div>
 
   <button id="sendBtn" onclick="connectAndSend()" disabled>📡 連接藍牙並傳送到墨水屏</button>
-  <div id="status">請先選擇規格並從相簿挑選圖片</div>
+  <div id="status">請先選擇螢幕型號及從相簿挑選圖片</div>
 
 <script>
-var SERVICE_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
-var CHAR_UUID    = "6e400002-b5a3-f393-e0a9-e50e24dcca9e";
+const SERVICE_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
+const CHAR_UUID    = "6e400002-b5a3-f393-e0a9-e50e24dcca9e";
 
-var hwW = 800, hwH = 480, colorMode = "BW";
-var isPortrait = false, imgAngle = 0;
-var offsetX = 0, offsetY = 0, zoomFactor = 1.0;
-var currentImg = null, packedData = null;
-var isDragging = false, lastX = 0, lastY = 0, initialPinchDist = 0, initialZoom = 1.0;
+let hwW = 648, hwH = 480, isPortrait = false, imgAngle = 0;
+let offsetX = 0, offsetY = 0, zoomFactor = 1.0;
+let currentImg = null, packedData = null;
+let isDragging = false, lastX = 0, lastY = 0, initialPinchDist = 0, initialZoom = 1.0;
 
-var canvas = document.getElementById('previewCanvas');
-var ctx = canvas.getContext('2d');
-var statusEl = document.getElementById('status');
-var zoomSlider = document.getElementById('zoomSlider');
+const canvas = document.getElementById('previewCanvas');
+const ctx = canvas.getContext('2d');
+const statusEl = document.getElementById('status');
+const zoomSlider = document.getElementById('zoomSlider');
 
-function changeConfig() {
-  var val = document.getElementById('screenSelect').value;
-  var xPos = val.indexOf('x');
-  hwW = Number(val.slice(0, xPos));
-  hwH = Number(val.slice(xPos + 1));
-  colorMode = document.getElementById('colorSelect').value;
-  offsetX = 0; offsetY = 0;
+function changeScreen() {
+  const [w, h] = document.getElementById('screenSelect').value.split('x').map(Number);
+  hwW = w; hwH = h; offsetX = 0; offsetY = 0;
   if (currentImg) { renderPreview(true); }
   else {
     canvas.width = isPortrait ? hwH : hwW;
     canvas.height = isPortrait ? hwW : hwH;
-    statusEl.innerText = "已設定：" + hwW + "×" + hwH + " (" + (colorMode === '3C' ? '黑白紅三色' : '純黑白') + ")";
+    statusEl.innerText = `已切換螢幕規格：${hwW} × ${hwH}`;
   }
 }
 
-document.getElementById('imageInput').addEventListener('change', function(e) {
-  var file = e.target.files.item(0);
+document.getElementById('imageInput').addEventListener('change', (e) => {
+  const file = e.target.files[0];
   if (!file) return;
-  statusEl.innerText = "正在處理圖片...";
-  var img = new Image();
-  img.onload = function() { currentImg = img; imgAngle = 0; resetTransform(); };
+  const img = new Image();
+  img.onload = () => { currentImg = img; imgAngle = 0; resetTransform(); };
   img.src = URL.createObjectURL(file);
 });
 
-zoomSlider.addEventListener('input', function(e) { zoomFactor = parseFloat(e.target.value); if (currentImg) renderPreview(false); });
-zoomSlider.addEventListener('change', function() { if (currentImg) renderPreview(true); });
+zoomSlider.addEventListener('input', (e) => { zoomFactor = parseFloat(e.target.value); if (currentImg) renderPreview(false); });
+zoomSlider.addEventListener('change', () => { if (currentImg) renderPreview(true); });
 
 function resetTransform() { offsetX = 0; offsetY = 0; zoomFactor = 1.0; zoomSlider.value = 1.0; if (currentImg) renderPreview(true); }
 
@@ -106,70 +94,56 @@ function toggleMode() {
   else {
     canvas.width = isPortrait ? hwH : hwW;
     canvas.height = isPortrait ? hwW : hwH;
+    statusEl.innerText = isPortrait ? `已切換為直向 (${hwH}×${hwW})` : `已切換為橫向 (${hwW}×${hwH})`;
   }
 }
 
 function rotateImg() { imgAngle = (imgAngle + 90) % 360; offsetX = 0; offsetY = 0; if (currentImg) renderPreview(true); }
 
-canvas.addEventListener('touchstart', function(e) {
+canvas.addEventListener('touchstart', (e) => {
   if (!currentImg) return; e.preventDefault();
-  if (e.touches.length === 1) {
-    var t0 = e.touches.item(0);
-    isDragging = true; lastX = t0.clientX; lastY = t0.clientY;
-  } else if (e.touches.length === 2) {
-    var t0 = e.touches.item(0), t1 = e.touches.item(1);
+  if (e.touches.length === 1) { isDragging = true; lastX = e.touches[0].clientX; lastY = e.touches[0].clientY; }
+  else if (e.touches.length === 2) {
     isDragging = false;
-    initialPinchDist = Math.hypot(t0.clientX - t1.clientX, t0.clientY - t1.clientY);
+    initialPinchDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
     initialZoom = zoomFactor;
   }
 }, { passive: false });
 
-canvas.addEventListener('touchmove', function(e) {
+canvas.addEventListener('touchmove', (e) => {
   if (!currentImg) return; e.preventDefault();
-  var scaleRatio = canvas.width / canvas.getBoundingClientRect().width;
+  const scaleRatio = canvas.width / canvas.getBoundingClientRect().width;
   if (e.touches.length === 1 && isDragging) {
-    var t0 = e.touches.item(0);
-    offsetX += (t0.clientX - lastX) * scaleRatio;
-    offsetY += (t0.clientY - lastY) * scaleRatio;
-    lastX = t0.clientX; lastY = t0.clientY;
+    offsetX += (e.touches[0].clientX - lastX) * scaleRatio;
+    offsetY += (e.touches[0].clientY - lastY) * scaleRatio;
+    lastX = e.touches[0].clientX; lastY = e.touches[0].clientY;
     renderPreview(false);
   } else if (e.touches.length === 2) {
-    var t0 = e.touches.item(0), t1 = e.touches.item(1);
-    var dist = Math.hypot(t0.clientX - t1.clientX, t0.clientY - t1.clientY);
+    const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
     zoomFactor = Math.min(3.0, Math.max(0.5, initialZoom * (dist / initialPinchDist)));
     zoomSlider.value = zoomFactor.toFixed(2);
     renderPreview(false);
   }
 }, { passive: false });
 
-canvas.addEventListener('touchend', function() { if (currentImg) { isDragging = false; renderPreview(true); } });
-canvas.addEventListener('mousedown', function(e) { if (currentImg) { isDragging = true; lastX = e.clientX; lastY = e.clientY; } });
-window.addEventListener('mousemove', function(e) {
+canvas.addEventListener('touchend', () => { if (currentImg) { isDragging = false; renderPreview(true); } });
+canvas.addEventListener('mousedown', (e) => { if (currentImg) { isDragging = true; lastX = e.clientX; lastY = e.clientY; } });
+window.addEventListener('mousemove', (e) => {
   if (!isDragging || !currentImg) return;
-  var scaleRatio = canvas.width / canvas.getBoundingClientRect().width;
+  const scaleRatio = canvas.width / canvas.getBoundingClientRect().width;
   offsetX += (e.clientX - lastX) * scaleRatio; offsetY += (e.clientY - lastY) * scaleRatio;
   lastX = e.clientX; lastY = e.clientY; renderPreview(false);
 });
-window.addEventListener('mouseup', function() { if (isDragging && currentImg) { isDragging = false; renderPreview(true); } });
-
-function matchColor(r, g, b, is3C) {
-  var d0 = r*r + g*g + b*b;
-  var d1 = (r-255)*(r-255) + (g-255)*(g-255) + (b-255)*(b-255);
-  if (!is3C) return (d0 < d1) ? 0 : 1;
-  var d2 = (r-220)*(r-220)*0.8 + (g-20)*(g-20)*1.2 + (b-20)*(b-20)*1.2;
-  if (d2 < d0 && d2 < d1) return 2;
-  return (d0 < d1) ? 0 : 1;
-}
+window.addEventListener('mouseup', () => { if (isDragging && currentImg) { isDragging = false; renderPreview(true); } });
 
 function renderPreview(applyDither) {
-  changeConfigSync();
-  var viewW = isPortrait ? hwH : hwW, viewH = isPortrait ? hwW : hwH;
+  const viewW = isPortrait ? hwH : hwW, viewH = isPortrait ? hwW : hwH;
   canvas.width = viewW; canvas.height = viewH;
   ctx.fillStyle = "#FFFFFF"; ctx.fillRect(0, 0, viewW, viewH);
 
-  var rotW = (imgAngle % 180 === 0) ? currentImg.width : currentImg.height;
-  var rotH = (imgAngle % 180 === 0) ? currentImg.height : currentImg.width;
-  var finalScale = Math.max(viewW / rotW, viewH / rotH) * zoomFactor;
+  const rotW = (imgAngle % 180 === 0) ? currentImg.width : currentImg.height;
+  const rotH = (imgAngle % 180 === 0) ? currentImg.height : currentImg.width;
+  const finalScale = Math.max(viewW / rotW, viewH / rotH) * zoomFactor;
 
   ctx.save();
   ctx.translate(viewW / 2 + offsetX, viewH / 2 + offsetY);
@@ -179,117 +153,66 @@ function renderPreview(applyDither) {
 
   if (!applyDither) return;
 
-  var is3C = (colorMode === "3C");
-  var imgData = ctx.getImageData(0, 0, viewW, viewH), d = imgData.data;
-  var totalPx = viewW * viewH;
-  var bufR = new Float32Array(totalPx);
-  var bufG = new Float32Array(totalPx);
-  var bufB = new Float32Array(totalPx);
+  const imgData = ctx.getImageData(0, 0, viewW, viewH), d = imgData.data, gray = new Float32Array(viewW * viewH);
+  for (let i = 0; i < viewW * viewH; i++) gray[i] = 0.299 * d[i*4] + 0.587 * d[i*4+1] + 0.114 * d[i*4+2];
 
-  var dv = new DataView(d.buffer);
-  for (var i = 0; i < totalPx; i++) {
-    var p4 = i * 4;
-    var r = dv.getUint8(p4), g = dv.getUint8(p4+1), b = dv.getUint8(p4+2);
-    if (!is3C) {
-      var gray = 0.299 * r + 0.587 * g + 0.114 * b;
-      bufR.subarray(i, i+1).fill(gray);
-      bufG.subarray(i, i+1).fill(gray);
-      bufB.subarray(i, i+1).fill(gray);
-    } else {
-      bufR.subarray(i, i+1).fill(r);
-      bufG.subarray(i, i+1).fill(g);
-      bufB.subarray(i, i+1).fill(b);
+  for (let y = 0; y < viewH; y++) {
+    for (let x = 0; x < viewW; x++) {
+      const idx = y * viewW + x, oldPixel = gray[idx], newPixel = oldPixel < 128 ? 0 : 255;
+      gray[idx] = newPixel; const err = oldPixel - newPixel;
+      if (x + 1 < viewW) gray[idx + 1] += err * 7 / 16;
+      if (x - 1 >= 0 && y + 1 < viewH) gray[idx + viewW - 1] += err * 3 / 16;
+      if (y + 1 < viewH) gray[idx + viewW] += err * 5 / 16;
+      if (x + 1 < viewW && y + 1 < viewH) gray[idx + viewW + 1] += err / 16;
+      const cIdx = idx * 4; d[cIdx] = d[cIdx+1] = d[cIdx+2] = newPixel;
     }
   }
+  ctx.putImageData(imgData, 0, 0);
 
-  var clsMap = new Uint8Array(totalPx);
-  var vR = new DataView(bufR.buffer), vG = new DataView(bufG.buffer), vB = new DataView(bufB.buffer);
-  var vCls = new DataView(clsMap.buffer);
-
-  var spread = function(nx, ny, er, eg, eb, w) {
-    if (nx >= 0 && nx < viewW && ny < viewH) {
-      var off = (ny * viewW + nx) * 4;
-      vR.setFloat32(off, vR.getFloat32(off, true) + er*w, true);
-      vG.setFloat32(off, vG.getFloat32(off, true) + eg*w, true);
-      vB.setFloat32(off, vB.getFloat32(off, true) + eb*w, true);
+  packedData = new Uint8Array((hwW * hwH) / 8);
+  for (let hy = 0; hy < hwH; hy++) {
+    for (let hx = 0; hx < hwW; hx++) {
+      const vx = isPortrait ? hy : hx, vy = isPortrait ? (hwW - 1) - hx : hy;
+      if (gray[vy * viewW + vx] > 128) {
+        const bitIdx = hy * hwW + hx;
+        packedData[bitIdx >> 3] |= (1 << (7 - (bitIdx & 7)));
+      }
     }
-  };
+  }
+  document.getElementById('sendBtn').disabled = false;
+  statusEl.innerText = `構圖已就緒 (${hwW}×${hwH})！點擊下方按鈕傳送`;
+}
 
-  for (var y = 0; y < viewH; y++) {
-    for (var x = 0; x < viewW; x++) {
-      var idx = y * viewW + x, off = idx * 4;
-      var or = vR.getFloat32(off, true), og = vG.getFloat32(off, true), ob = vB.getFloat32(off, true);
-      var ci = matchColor(or, og, ob, is3C);
-      vCls.setUint8(idx, ci);
-      var nr = (ci === 1) ? 255 : (ci === 2 ? 220 : 0);
-      var ng = (ci === 1) ? 255 : (ci === 2 ? 20 : 0);
-      var nb = (ci === 1) ? 255 : (ci === 2 ? 20 : 0);
-      var er = or - nr, eg = og - ng, eb = ob - nb;
-
-      spread(x+1, y, er, eg, eb, 7/16);
-      spread(x-1, y+1, er, eg, eb, 3/16);
-      spread(x, y+1, er, eg, eb, 5/16);
-      spread(x+1, y+1, er, eg, eb, 1/16);
-
-dv.setUint8(off, nr); dv.setUint8(off+1, ng); dv.setUint8(off+2, nb); dv.setUint8(off+3, 255);
-}
-}
-ctx.putImageData(imgData, 0, 0);
-var planeBytes = (hwW * hwH) / 8;
-packedData = new Uint8Array(is3C ? planeBytes * 2 : planeBytes);
-var vPk = new DataView(packedData.buffer);
-for (var hy = 0; hy < hwH; hy++) {
-for (var hx = 0; hx < hwW; hx++) {
-var vx = isPortrait ? hy : hx, vy = isPortrait ? (hwW - 1) - hx : hy;
-var c = vCls.getUint8(vy * viewW + vx);
-var bitIdx = hy * hwW + hx;
-var bytePos = bitIdx >> 3;
-var bitMask = 1 << (7 - (bitIdx & 7));
-if (c !== 0) vPk.setUint8(bytePos, vPk.getUint8(bytePos) | bitMask);
-if (is3C && c === 2) {
-var rPos = planeBytes + bytePos;
-vPk.setUint8(rPos, vPk.getUint8(rPos) | bitMask);
-}
-}
-}
-document.getElementById('sendBtn').disabled = false;
-statusEl.innerText = "就緒：" + hwW + "×" + hwH + " (" + (is3C ? "三色模式" : "黑白模式") + ")";
-}
-function changeConfigSync() {
-var val = document.getElementById('screenSelect').value;
-var xPos = val.indexOf('x');
-hwW = Number(val.slice(0, xPos));
-hwH = Number(val.slice(xPos + 1));
-colorMode = document.getElementById('colorSelect').value;
-}
 async function connectAndSend() {
-if (!packedData) return;
-var btn = document.getElementById('sendBtn'); btn.disabled = true;
-try {
-statusEl.innerText = "正在搜尋 E-Ink_Frame...";
-var filterObj = { name: "E-Ink_Frame" };
-var filtersList = new Array(1); filtersList.fill(filterObj);
-var svcList = new Array(1); svcList.fill(SERVICE_UUID);
-var device = await navigator.bluetooth.requestDevice({ filters: filtersList, optionalServices: svcList });
-statusEl.innerText = "正在連接 iPhone 藍牙...";
-var server = await device.gatt.connect();
-var service = await server.getPrimaryService(SERVICE_UUID);
-var char = await service.getCharacteristic(CHAR_UUID);
-var encoder = new TextEncoder();
-await char.writeValueWithResponse(encoder.encode("START"));
-await new Promise(function(r) { setTimeout(r, 150); });
-var CHUNK = 160;
-for (var i = 0; i < packedData.length; i += CHUNK) {
-await char.writeValueWithoutResponse(packedData.slice(i, i + CHUNK));
-await new Promise(function(r) { setTimeout(r, 22); });
-if (i % (CHUNK * 12) === 0) statusEl.innerText = "穩定傳送中... " + Math.round((i / packedData.length) * 100) + "%";
+  if (!packedData) return;
+  const btn = document.getElementById('sendBtn'); btn.disabled = true;
+  try {
+    statusEl.innerText = "正在搜尋 E-Ink_Frame...";
+    const device = await navigator.bluetooth.requestDevice({ filters: [{ name: "E-Ink_Frame" }], optionalServices: [SERVICE_UUID] });
+    statusEl.innerText = "正在連接 iPhone 藍牙...";
+    const server = await device.gatt.connect();
+    const service = await server.getPrimaryService(SERVICE_UUID);
+    const char = await service.getCharacteristic(CHAR_UUID);
+    const encoder = new TextEncoder();
+    await char.writeValueWithResponse(encoder.encode("START"));
+    await new Promise(r => setTimeout(r, 150));
+
+    const CHUNK = 160;
+    for (let i = 0; i < packedData.length; i += CHUNK) {
+      await char.writeValueWithoutResponse(packedData.slice(i, i + CHUNK));
+      await new Promise(r => setTimeout(r, 22));
+      if (i % (CHUNK * 10) === 0) statusEl.innerText = `穩定傳送中... ${Math.round((i / packedData.length) * 100)}%`;
+    }
+
+    await new Promise(r => setTimeout(r, 200));
+    await char.writeValueWithResponse(encoder.encode("END"));
+    statusEl.innerText = "✅ 傳送完成！墨水屏正在清屏並刷新...";
+    setTimeout(() => { device.gatt.disconnect(); btn.disabled = false; }, 2000);
+  } catch (err) {
+    statusEl.innerText = "❌ 錯誤：" + err.message;
+    btn.disabled = false;
+  }
 }
-await new Promise(function(r) { setTimeout(r, 200); });
-await char.writeValueWithResponse(encoder.encode("END"));
-statusEl.innerText = "✅ 傳送完成！墨水屏正在清屏並刷新...";
-setTimeout(function() { device.gatt.disconnect(); btn.disabled = false; }, 2000);
-} catch (err) {
-statusEl.innerText = "❌ 錯誤：" + err.message;
-btn.disabled = false;
-}
-}
+</script>
+</body>
+</html>
