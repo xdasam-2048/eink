@@ -71,6 +71,22 @@ const ctx = canvas.getContext('2d');
 const statusEl = document.getElementById('status');
 const zoomSlider = document.getElementById('zoomSlider');
 
+function getFirst(list) {
+  if (!list) return null;
+  for (const item of list) return item;
+  return null;
+}
+
+function getSecond(list) {
+  if (!list) return null;
+  let count = 0;
+  for (const item of list) {
+    if (count === 1) return item;
+    count++;
+  }
+  return null;
+}
+
 function changeScreen() {
   const val = document.getElementById('screenSelect').value;
   const xIdx = val.indexOf('x');
@@ -87,9 +103,8 @@ function changeScreen() {
 }
 
 document.getElementById('imageInput').addEventListener('change', (e) => {
-  const files = e.target.files;
-  if (!files || files.length === 0) return;
-  const file = files[0];
+  const file = getFirst(e.target.files);
+  if (!file) return;
   const img = new Image();
   img.onload = () => { currentImg = img; imgAngle = 0; resetTransform(); };
   img.src = URL.createObjectURL(file);
@@ -113,10 +128,13 @@ function rotateImg() { imgAngle = (imgAngle + 90) % 360; offsetX = 0; offsetY = 
 
 canvas.addEventListener('touchstart', (e) => {
   if (!currentImg) return; e.preventDefault();
-  if (e.touches.length === 1) { isDragging = true; lastX = e.touches[0].clientX; lastY = e.touches[0].clientY; }
-  else if (e.touches.length === 2) {
+  if (e.touches.length === 1) {
+    const t0 = getFirst(e.touches);
+    isDragging = true; lastX = t0.clientX; lastY = t0.clientY;
+  } else if (e.touches.length === 2) {
+    const t0 = getFirst(e.touches), t1 = getSecond(e.touches);
     isDragging = false;
-    initialPinchDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+    initialPinchDist = Math.hypot(t0.clientX - t1.clientX, t0.clientY - t1.clientY);
     initialZoom = zoomFactor;
   }
 }, { passive: false });
@@ -125,12 +143,14 @@ canvas.addEventListener('touchmove', (e) => {
   if (!currentImg) return; e.preventDefault();
   const scaleRatio = canvas.width / canvas.getBoundingClientRect().width;
   if (e.touches.length === 1 && isDragging) {
-    offsetX += (e.touches[0].clientX - lastX) * scaleRatio;
-    offsetY += (e.touches[0].clientY - lastY) * scaleRatio;
-    lastX = e.touches[0].clientX; lastY = e.touches[0].clientY;
+    const t0 = getFirst(e.touches);
+    offsetX += (t0.clientX - lastX) * scaleRatio;
+    offsetY += (t0.clientY - lastY) * scaleRatio;
+    lastX = t0.clientX; lastY = t0.clientY;
     renderPreview(false);
   } else if (e.touches.length === 2) {
-    const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+    const t0 = getFirst(e.touches), t1 = getSecond(e.touches);
+    const dist = Math.hypot(t0.clientX - t1.clientX, t0.clientY - t1.clientY);
     zoomFactor = Math.min(3.0, Math.max(0.5, initialZoom * (dist / initialPinchDist)));
     zoomSlider.value = zoomFactor.toFixed(2);
     renderPreview(false);
@@ -176,7 +196,6 @@ function renderPreview(applyDither) {
   const clsMap = new Uint8Array(totalPx);
 
   if (!is3C) {
-    // 與你成功那版完全一致的純黑白極速引擎
     const gray = new Float32Array(totalPx);
     for (let i = 0; i < totalPx; i++) gray[i] = 0.299 * d[i*4] + 0.587 * d[i*4+1] + 0.114 * d[i*4+2];
     for (let y = 0; y < viewH; y++) {
@@ -192,7 +211,6 @@ function renderPreview(applyDither) {
       }
     }
   } else {
-    // 黑白紅三色抖動引擎
     const rBuf = new Float32Array(totalPx), gBuf = new Float32Array(totalPx), bBuf = new Float32Array(totalPx);
     for (let i = 0; i < totalPx; i++) { rBuf[i] = d[i*4]; gBuf[i] = d[i*4+1]; bBuf[i] = d[i*4+2]; }
     for (let y = 0; y < viewH; y++) {
@@ -207,11 +225,11 @@ function renderPreview(applyDither) {
         clsMap[idx] = ci;
         const nr = (ci === 1) ? 255 : (ci === 2 ? 220 : 0);
         const ng = (ci === 1) ? 255 : (ci === 2 ? 20 : 0);
-        const nb = (ci === 1) ? 255 : (ci === 2 ? 20 : 0);
-        const er = or - nr, eg = og - ng, eb = ob - nb;
-        if (x + 1 < viewW) { rBuf[idx+1] += er*7/16; gBuf[idx+1] += eg*7/16; bBuf[idx+1] += eb*7/16; }
+const nb = (ci === 1) ? 255 : (ci === 2 ? 20 : 0);
+const er = or - nr, eg = og - ng, eb = ob - nb;
+if (x + 1 < viewW) { rBuf[idx+1] += er7/16; gBuf[idx+1] += eg7/16; bBuf[idx+1] += eb7/16; }
 if (x - 1 >= 0 && y + 1 < viewH) { rBuf[idx+viewW-1] += er3/16; gBuf[idx+viewW-1] += eg3/16; bBuf[idx+viewW-1] += eb3/16; }
-if (y + 1 < viewH) { rBuf[idx+viewW] += er5/16; gBuf[idx+viewW] += eg5/16; bBuf[idx+viewW] += eb5/16; }
+if (y + 1 < viewH) { rBuf[idx+viewW] += er5/16; gBuf[idx+viewW] += eg5/16; bBuf[idx+viewW] += eb*5/16; }
 if (x + 1 < viewW && y + 1 < viewH) { rBuf[idx+viewW+1] += er/16; gBuf[idx+viewW+1] += eg/16; bBuf[idx+viewW+1] += eb/16; }
 const cIdx = idx * 4; d[cIdx] = nr; d[cIdx+1] = ng; d[cIdx+2] = nb;
 }
@@ -260,3 +278,5 @@ statusEl.innerText = "❌ 錯誤：" + err.message;
 btn.disabled = false;
 }
 }
+
+      
