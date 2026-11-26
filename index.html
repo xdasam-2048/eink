@@ -9,14 +9,14 @@
   h2 { margin: 6px 0 4px; font-size: 20px; }
   p { color: #aaa; font-size: 13px; margin: 0 0 10px; }
   select, input, button { font-size: 15px; padding: 12px 14px; margin: 5px 0; border-radius: 12px; border: none; width: 92%; max-width: 400px; }
-  select, input[type="file"] { background: #2a2a2a; color: #fff; }
+  select, input { background: #2a2a2a; color: #fff; }
   .row { display: flex; justify-content: center; gap: 8px; width: 92%; max-width: 400px; margin: 4px auto; }
   .row button { width: 50%; margin: 0; background: #2c2c2e; color: #fff; font-size: 14px; }
   .slider-box { display: flex; align-items: center; justify-content: center; gap: 10px; width: 92%; max-width: 400px; margin: 6px auto; font-size: 14px; color: #ccc; }
-  .slider-box input[type="range"] { flex: 1; padding: 0; margin: 0; }
+  .slider-box input { flex: 1; padding: 0; margin: 0; }
   #sendBtn { background: #0a84ff; color: #fff; font-weight: bold; font-size: 16px; margin-top: 8px; }
   #sendBtn:disabled { background: #444; color: #888; }
-  canvas { max-width: 92%; max-height: 310px; border: 2px solid #555; margin-top: 8px; background: #fff; border-radius: 6px; touch-action: none; cursor: grab; }
+  canvas { max-width: 92%; max-height: 310px; border: 2px solid #555; margin-top: 8px; background: #fff; border-radius: 6px; touch-action: none; }
   #status { margin-top: 10px; color: #30d158; font-weight: bold; font-size: 15px; }
 </style>
 </head>
@@ -72,29 +72,31 @@ const statusEl = document.getElementById('status');
 const zoomSlider = document.getElementById('zoomSlider');
 
 function changeConfig() {
-  const parts = document.getElementById('screenSelect').value.split('x');
-  hwW = Number(parts.at(0));
-  hwH = Number(parts.at(1));
+  const val = document.getElementById('screenSelect').value;
+  const xPos = val.indexOf('x');
+  hwW = Number(val.slice(0, xPos));
+  hwH = Number(val.slice(xPos + 1));
   colorMode = document.getElementById('colorSelect').value;
   offsetX = 0; offsetY = 0;
   if (currentImg) { renderPreview(true); }
   else {
     canvas.width = isPortrait ? hwH : hwW;
     canvas.height = isPortrait ? hwW : hwH;
-    statusEl.innerText = `已設定：${hwW}×${hwH} (${colorMode === '3C' ? '黑白紅三色' : '純黑白'})`;
+    statusEl.innerText = "已設定：" + hwW + "×" + hwH + " (" + (colorMode === '3C' ? '黑白紅三色' : '純黑白') + ")";
   }
 }
 
-document.getElementById('imageInput').addEventListener('change', (e) => {
+document.getElementById('imageInput').addEventListener('change', function(e) {
   const file = e.target.files.item(0);
   if (!file) return;
+  statusEl.innerText = "正在處理圖片...";
   const img = new Image();
-  img.onload = () => { currentImg = img; imgAngle = 0; resetTransform(); };
+  img.onload = function() { currentImg = img; imgAngle = 0; resetTransform(); };
   img.src = URL.createObjectURL(file);
 });
 
-zoomSlider.addEventListener('input', (e) => { zoomFactor = parseFloat(e.target.value); if (currentImg) renderPreview(false); });
-zoomSlider.addEventListener('change', () => { if (currentImg) renderPreview(true); });
+zoomSlider.addEventListener('input', function(e) { zoomFactor = parseFloat(e.target.value); if (currentImg) renderPreview(false); });
+zoomSlider.addEventListener('change', function() { if (currentImg) renderPreview(true); });
 
 function resetTransform() { offsetX = 0; offsetY = 0; zoomFactor = 1.0; zoomSlider.value = 1.0; if (currentImg) renderPreview(true); }
 
@@ -109,7 +111,7 @@ function toggleMode() {
 
 function rotateImg() { imgAngle = (imgAngle + 90) % 360; offsetX = 0; offsetY = 0; if (currentImg) renderPreview(true); }
 
-canvas.addEventListener('touchstart', (e) => {
+canvas.addEventListener('touchstart', function(e) {
   if (!currentImg) return; e.preventDefault();
   if (e.touches.length === 1) {
     const t0 = e.touches.item(0);
@@ -122,7 +124,7 @@ canvas.addEventListener('touchstart', (e) => {
   }
 }, { passive: false });
 
-canvas.addEventListener('touchmove', (e) => {
+canvas.addEventListener('touchmove', function(e) {
   if (!currentImg) return; e.preventDefault();
   const scaleRatio = canvas.width / canvas.getBoundingClientRect().width;
   if (e.touches.length === 1 && isDragging) {
@@ -140,28 +142,24 @@ canvas.addEventListener('touchmove', (e) => {
   }
 }, { passive: false });
 
-canvas.addEventListener('touchend', () => { if (currentImg) { isDragging = false; renderPreview(true); } });
-canvas.addEventListener('mousedown', (e) => { if (currentImg) { isDragging = true; lastX = e.clientX; lastY = e.clientY; } });
-window.addEventListener('mousemove', (e) => {
+canvas.addEventListener('touchend', function() { if (currentImg) { isDragging = false; renderPreview(true); } });
+canvas.addEventListener('mousedown', function(e) { if (currentImg) { isDragging = true; lastX = e.clientX; lastY = e.clientY; } });
+window.addEventListener('mousemove', function(e) {
   if (!isDragging || !currentImg) return;
   const scaleRatio = canvas.width / canvas.getBoundingClientRect().width;
   offsetX += (e.clientX - lastX) * scaleRatio; offsetY += (e.clientY - lastY) * scaleRatio;
   lastX = e.clientX; lastY = e.clientY; renderPreview(false);
 });
-window.addEventListener('mouseup', () => { if (isDragging && currentImg) { isDragging = false; renderPreview(true); } });
+window.addEventListener('mouseup', function() { if (isDragging && currentImg) { isDragging = false; renderPreview(true); } });
 
-const PAL_BW = Array.of({r:0, g:0, b:0}, {r:255, g:255, b:255});
-const PAL_3C = Array.of({r:0, g:0, b:0}, {r:255, g:255, b:255}, {r:220, g:20, b:20});
-
-function nearestColor(r, g, b, pal) {
-  let best = 0, minD = 1e9;
-  for (let i = 0; i < pal.length; i++) {
-    const c = pal.at(i);
-    const dr = r - c.r, dg = g - c.g, db = b - c.b;
-    const d = (i === 2) ? (dr*dr*0.8 + dg*dg*1.2 + db*db*1.2) : (dr*dr + dg*dg + db*db);
-    if (d < minD) { minD = d; best = i; }
-  }
-  return best;
+function matchColor(r, g, b, is3C) {
+  // 0=黑(0,0,0), 1=白(255,255,255), 2=紅(220,20,20)
+  const d0 = r*r + g*g + b*b;
+  const d1 = (r-255)*(r-255) + (g-255)*(g-255) + (b-255)*(b-255);
+  if (!is3C) return (d0 < d1) ? 0 : 1;
+  const d2 = (r-220)*(r-220)*0.8 + (g-20)*(g-20)*1.2 + (b-20)*(b-20)*1.2;
+  if (d2 < d0 && d2 < d1) return 2;
+  return (d0 < d1) ? 0 : 1;
 }
 
 function renderPreview(applyDither) {
@@ -181,83 +179,94 @@ function renderPreview(applyDither) {
 
   if (!applyDither) return;
 
+  const is3C = (colorMode === "3C");
   const imgData = ctx.getImageData(0, 0, viewW, viewH), d = imgData.data;
   const buf = new Float32Array(viewW * viewH * 3);
   for (let i = 0; i < viewW * viewH; i++) {
-    if (colorMode === "BW") {
-      const g = 0.299 * d[i*4] + 0.587 * d[i*4+1] + 0.114 * d[i*4+2];
-      buf[i*3] = buf[i*3+1] = buf[i*3+2] = g;
+    const p4 = i * 4, p3 = i * 3;
+    if (!is3C) {
+      const g = 0.299 * d.at(p4) + 0.587 * d.at(p4+1) + 0.114 * d.at(p4+2);
+      buf.set(Float32Array.of(g, g, g), p3);
     } else {
-      buf[i*3] = d[i*4]; buf[i*3+1] = d[i*4+1]; buf[i*3+2] = d[i*4+2];
+      buf.set(Float32Array.of(d.at(p4), d.at(p4+1), d.at(p4+2)), p3);
     }
   }
 
-  const pal = (colorMode === "3C") ? PAL_3C : PAL_BW;
   const clsMap = new Uint8Array(viewW * viewH);
+  const spread = function(nx, ny, er, eg, eb, w) {
+    if (nx >= 0 && nx < viewW && ny < viewH) {
+      const ni = (ny * viewW + nx) * 3;
+      buf.set(Float32Array.of(buf.at(ni) + er*w, buf.at(ni+1) + eg*w, buf.at(ni+2) + eb*w), ni);
+    }
+  };
 
   for (let y = 0; y < viewH; y++) {
     for (let x = 0; x < viewW; x++) {
       const idx = y * viewW + x, p3 = idx * 3;
-      const or = buf[p3], og = buf[p3+1], ob = buf[p3+2];
-      const ci = nearestColor(or, og, ob, pal);
-      clsMap[idx] = ci;
-      const nc = pal.at(ci);
-      const er = or - nc.r, eg = og - nc.g, eb = ob - nc.b;
+      const or = buf.at(p3), og = buf.at(p3+1), ob = buf.at(p3+2);
+      const ci = matchColor(or, og, ob, is3C);
+      clsMap.set(Uint8Array.of(ci), idx);
+      const nr = (ci === 1) ? 255 : (ci === 2 ? 220 : 0);
+      const ng = (ci === 1) ? 255 : (ci === 2 ? 20 : 0);
+      const nb = (ci === 1) ? 255 : (ci === 2 ? 20 : 0);
+      const er = or - nr, eg = og - ng, eb = ob - nb;
 
-      const spread = (dx, dy, w) => {
-        const nx = x + dx, ny = y + dy;
-        if (nx >= 0 && nx < viewW && ny < viewH) {
-          const ni = (ny * viewW + nx) * 3;
-          buf[ni] += er * w; buf[ni+1] += eg * w; buf[ni+2] += eb * w;
-        }
-      };
-      spread(1, 0, 7/16); spread(-1, 1, 3/16); spread(0, 1, 5/16); spread(1, 1, 1/16);
+      spread(x+1, y, er, eg, eb, 7/16);
+      spread(x-1, y+1, er, eg, eb, 3/16);
+      spread(x, y+1, er, eg, eb, 5/16);
+      spread(x+1, y+1, er, eg, eb, 1/16);
 
-      const cIdx = idx * 4; d[cIdx] = nc.r; d[cIdx+1] = nc.g; d[cIdx+2] = nc.b;
+      d.set(Uint8ClampedArray.of(nr, ng, nb, 255), idx * 4);
     }
   }
   ctx.putImageData(imgData, 0, 0);
 
   const planeBytes = (hwW * hwH) / 8;
-  packedData = new Uint8Array(colorMode === "3C" ? planeBytes * 2 : planeBytes);
+  packedData = new Uint8Array(is3C ? planeBytes * 2 : planeBytes);
 
   for (let hy = 0; hy < hwH; hy++) {
     for (let hx = 0; hx < hwW; hx++) {
       const vx = isPortrait ? hy : hx, vy = isPortrait ? (hwW - 1) - hx : hy;
-      const c = clsMap[vy * viewW + vx];
+      const c = clsMap.at(vy * viewW + vx);
       const bitIdx = hy * hwW + hx;
-      if (c !== 0) packedData[bitIdx >> 3] |= (1 << (7 - (bitIdx & 7)));
-      if (colorMode === "3C" && c === 2) {
-packedData[planeBytes + (bitIdx >> 3)] |= (1 << (7 - (bitIdx & 7)));
+      const bytePos = bitIdx >> 3;
+const bitMask = 1 << (7 - (bitIdx & 7));
+if (c !== 0) packedData.set(Uint8Array.of(packedData.at(bytePos) | bitMask), bytePos);
+if (is3C && c === 2) {
+const rPos = planeBytes + bytePos;
+packedData.set(Uint8Array.of(packedData.at(rPos) | bitMask), rPos);
 }
 }
 }
 document.getElementById('sendBtn').disabled = false;
-statusEl.innerText = 就緒：${hwW}×${hwH} (${colorMode === '3C' ? '三色模式' : '黑白模式'});
+statusEl.innerText = "就緒：" + hwW + "×" + hwH + " (" + (is3C ? "三色模式" : "黑白模式") + ")";
 }
 async function connectAndSend() {
 if (!packedData) return;
 const btn = document.getElementById('sendBtn'); btn.disabled = true;
 try {
 statusEl.innerText = "正在搜尋 E-Ink_Frame...";
-const device = await navigator.bluetooth.requestDevice({ filters: Array.of({ name: "E-Ink_Frame" }), optionalServices: Array.of(SERVICE_UUID) });
+const device = await navigator.bluetooth.requestDevice({
+filters: Array.of({ name: "E-Ink_Frame" }),
+optionalServices: Array.of(SERVICE_UUID)
+});
 statusEl.innerText = "正在連接 iPhone 藍牙...";
 const server = await device.gatt.connect();
 const service = await server.getPrimaryService(SERVICE_UUID);
 const char = await service.getCharacteristic(CHAR_UUID);
 const encoder = new TextEncoder();
 await char.writeValueWithResponse(encoder.encode("START"));
-await new Promise(r => setTimeout(r, 150));
+await new Promise(function(r) { setTimeout(r, 150); });
 const CHUNK = 160;
 for (let i = 0; i < packedData.length; i += CHUNK) {
 await char.writeValueWithoutResponse(packedData.slice(i, i + CHUNK));
-await new Promise(r => setTimeout(r, 22));
-if (i % (CHUNK * 12) === 0) statusEl.innerText = 穩定傳送中... ${Math.round((i / packedData.length) * 100)}%;
+await new Promise(function(r) { setTimeout(r, 22); });
+if (i % (CHUNK * 12) === 0) statusEl.innerText = "穩定傳送中... " + Math.round((i / packedData.length) * 100) + "%";
 }
-await new Promise(r => setTimeout(r, 200));
+await new Promise(function(r) { setTimeout(r, 200); });
 await char.writeValueWithResponse(encoder.encode("END"));
 statusEl.innerText = "✅ 傳送完成！墨水屏正在清屏並刷新...";
-setTimeout(() => { device.gatt.disconnect(); btn.disabled = false; }, 2000);
+setTimeout(function() { device.gatt.disconnect(); btn.disabled = false; }, 2000);
 } catch (err) {
 statusEl.innerText = "❌ 錯誤：" + err.message;
 btn.disabled = false;
