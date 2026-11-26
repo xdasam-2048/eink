@@ -26,8 +26,8 @@ canvas{max-width:92%;max-height:300px;border:2px solid #555;margin-top:6px;backg
   <option value="400x300">4.2 吋 屏 HINK-E042A13 (400×300)</option>
 </select>
 <select id="col" onchange="upd()">
-  <option value="BW">⚫⚪ 純黑白輸出</option>
-  <option value="3C">⚫⚪🔴 三色輸出 (黑白紅)</option>
+  <option value="BW">⚫⚪ 純黑白 (Atkinson 推薦算法)</option>
+  <option value="3C">⚫⚪🔴 三色輸出 (Atkinson 抗紅斑)</option>
 </select>
 <input type="file" id="inp" accept="image/*">
 <div class="row">
@@ -43,32 +43,30 @@ canvas{max-width:92%;max-height:300px;border:2px solid #555;margin-top:6px;backg
 <div id="st">請先揀選螢幕尺寸及相片</div>
 <script>
 const SU="6e400001-b5a3-f393-e0a9-e50e24dcca9e",CU="6e400002-b5a3-f393-e0a9-e50e24dcca9e";
-let W=800,H=480,is3C=false,rot=false,ang=0,ox=0,oy=0,img=null,pkg=null,drag=false,lx=0,ly=0,pDist=0,pZm=1;
+let W=800,H=480,is3C=false,rot=false,ang=0,ox=0,oy=0,img=null,pkg=null,drag=false,lx=0,ly=0;
 const cv=document.getElementById('cv'),ctx=cv.getContext('2d'),st=document.getElementById('st'),zm=document.getElementById('zm');
 
-document.getElementById('inp').onchange=e=>{
-  for(const f of e.target.files){
-    const im=new Image();
-    im.onload=()=>{img=im;ang=ox=oy=0;zm.value=1;upd();};
-    im.src=URL.createObjectURL(f);break;
-  }
+document.getElementById('inp').onchange=function(e){
+  const files=e.target.files;if(!files||!files.length)return;
+  const f=files.item(0)||files;const im=new Image();
+  im.onload=function(){img=im;ang=ox=oy=0;zm.value=1;upd();};im.src=URL.createObjectURL(f);
 };
-zm.oninput=()=>draw(false);zm.onchange=()=>draw(true);
-cv.addEventListener('touchstart',e=>{if(!img)return;e.preventDefault();const t=e.touches;if(t.length===1){drag=true;for(const p of t){lx=p.clientX;ly=p.clientY;break;}}else if(t.length===2){drag=false;let x1,y1,x2,y2,n=0;for(const p of t){if(n===0){x1=p.clientX;y1=p.clientY;}else{x2=p.clientX;y2=p.clientY;}n++;}pDist=Math.hypot(x1-x2,y1-y2);pZm=+zm.value;}},{passive:false});
-cv.addEventListener('touchmove',e=>{if(!img)return;e.preventDefault();const r=cv.width/cv.getBoundingClientRect().width,t=e.touches;if(t.length===1&&drag){for(const p of t){ox+=(p.clientX-lx)*r;oy+=(p.clientY-ly)*r;lx=p.clientX;ly=p.clientY;break;}draw(false);}else if(t.length===2){let x1,y1,x2,y2,n=0;for(const p of t){if(n===0){x1=p.clientX;y1=p.clientY;}else{x2=p.clientX;y2=p.clientY;}n++;}zm.value=Math.min(3,Math.max(0.5,pZm*(Math.hypot(x1-x2,y1-y2)/pDist))).toFixed(2);draw(false);}},{passive:false});
-cv.addEventListener('touchend',()=>{if(img){drag=false;draw(true);}});
+zm.oninput=function(){if(img)draw(false);};zm.onchange=function(){if(img)draw(true);};
+cv.addEventListener('touchstart',function(e){if(!img)return;e.preventDefault();if(e.touches.length===1){drag=true;lx=e.touches.item(0).clientX;ly=e.touches.item(0).clientY;}},{passive:false});
+cv.addEventListener('touchmove',function(e){if(!img||!drag)return;e.preventDefault();const r=cv.width/cv.getBoundingClientRect().width;ox+=(e.touches.item(0).clientX-lx)*r;oy+=(e.touches.item(0).clientY-ly)*r;lx=e.touches.item(0).clientX;ly=e.touches.item(0).clientY;draw(false);},{passive:false});
+cv.addEventListener('touchend',function(){if(img){drag=false;draw(true);}});
 
 function upd(){
   const v=document.getElementById('scr').value,x=v.indexOf('x');
-  W=+v.slice(0,x);H=+v.slice(x+1);is3C=document.getElementById('col').value==='3C';
-  if(img)draw(true);else{cv.width=rot?H:W;cv.height=rot?W:H;st.innerText=`已選：${W}×${H} (${is3C?'三色':'黑白'})`;}
+  W=Number(v.slice(0,x));H=Number(v.slice(x+1));is3C=document.getElementById('col').value==='3C';
+  if(img)draw(true);else{cv.width=rot?H:W;cv.height=rot?W:H;st.innerText='已選：'+W+'×'+H+' ('+(is3C?'三色':'黑白')+')';}
 }
 
 function draw(dither){
   const vw=rot?H:W,vh=rot?W:H;cv.width=vw;cv.height=vh;
   ctx.fillStyle="#FFF";ctx.fillRect(0,0,vw,vh);
   const rw=ang%180?img.height:img.width,rh=ang%180?img.width:img.height;
-  const sc=Math.max(vw/rw,vh/rh)*(+zm.value);
+  const sc=Math.max(vw/rw,vh/rh)*Number(zm.value);
   ctx.save();ctx.translate(vw/2+ox,vh/2+oy);ctx.rotate(ang*Math.PI/180);
   ctx.drawImage(img,-img.width*sc/2,-img.height*sc/2,img.width*sc,img.height*sc);ctx.restore();
   if(!dither)return;
@@ -79,15 +77,17 @@ function draw(dither){
     if(!is3C){const g=0.299*d[i*4]+0.587*d[i*4+1]+0.114*d[i*4+2];rb[i]=gb[i]=bb[i]=g;}
     else{rb[i]=d[i*4];gb[i]=d[i*4+1];bb[i]=d[i*4+2];}
   }
+  // Atkinson 抖動 (只擴散 6/8 誤差，高對比零紅斑)
+  const sp=(x,y,er,eg,eb)=>{if(x>=0&&x<vw&&y<vh){const k=y*vw+x;rb[k]+=er/8;gb[k]+=eg/8;bb[k]+=eb/8;}};
   for(let y=0;y<vh;y++)for(let x=0;x<vw;x++){
     const i=y*vw+x,or=rb[i],og=gb[i],ob=bb[i];
-    const d0=or*or+og*og+ob*ob,d1=(or-255)**2+(og-255)**2+(ob-255)**2;
-    const d2=is3C?((or-220)**2*0.8+(og-20)**2*1.2+(ob-20)**2*1.2):1e18;
+    const d0=or*or+og*og+ob*ob,d1=(or-255)*(or-255)+(og-255)*(og-255)+(ob-255)*(ob-255);
+    // 提高純紅門檻 (dr^2*1.4)，過濾人臉暖膚色
+    const d2=(is3C&&(or-og>55)&&(or-ob>55))?((or-210)*(or-210)*1.3+(og-25)*(og-25)+(ob-25)*(ob-25)):1e18;
     const ci=(d2<d0&&d2<d1)?2:(d0<d1?0:1);cls[i]=ci;
-    const nr=ci===1?255:(ci===2?220:0),ng=ci===1?255:(ci===2?20:0),nb=ci===1?255:(ci===2?20:0);
+    const nr=ci===1?255:(ci===2?210:0),ng=ci===1?255:(ci===2?25:0),nb=ci===1?255:(ci===2?25:0);
     const er=or-nr,eg=og-ng,eb=ob-nb;
-    const sp=(dx,dy,w)=>{const nx=x+dx,ny=y+dy;if(nx>=0&&nx<vw&&ny<vh){const ni=ny*vw+nx;rb[ni]+=er*w;gb[ni]+=eg*w;bb[ni]+=eb*w;}};
-    sp(1,0,7/16);sp(-1,1,3/16);sp(0,1,5/16);sp(1,1,1/16);
+    sp(x+1,y,er,eg,eb);sp(x+2,y,er,eg,eb);sp(x-1,y+1,er,eg,eb);sp(x,y+1,er,eg,eb);sp(x+1,y+1,er,eg,eb);sp(x,y+2,er,eg,eb);
     d[i*4]=nr;d[i*4+1]=ng;d[i*4+2]=nb;
   }
   ctx.putImageData(id,0,0);
@@ -99,25 +99,24 @@ function draw(dither){
     if(is3C&&c===2)pkg[pb+(bi>>3)]|=(1<<(7-(bi&7)));
   }
   document.getElementById('sendBtn').disabled=false;
-  st.innerText=`就緒：${W}×${H} (${is3C?'三色':'黑白'})，請按傳送`;
+  st.innerText='就緒：'+W+'×'+H+' ('+(is3C?'三色Atkinson':'黑白Atkinson')+')';
 }
 
 async function send(){
   if(!pkg)return;const b=document.getElementById('sendBtn');b.disabled=true;
   try{
     st.innerText="搜尋 E-Ink_Frame...";
-    const fl=new Array(1);fl.fill({name:"E-Ink_Frame"});const sl=new Array(1);sl.fill(SU);
-    const dev=await navigator.bluetooth.requestDevice({filters:fl,optionalServices:sl});
+    const dev=await navigator.bluetooth.requestDevice({filters:[{name:"E-Ink_Frame"}],optionalServices:[SU]});
     st.innerText="連接藍牙...";
     const sv=await dev.gatt.connect(),sr=await sv.getPrimaryService(SU),ch=await sr.getCharacteristic(CU),enc=new TextEncoder();
     await ch.writeValueWithResponse(enc.encode("START"));await new Promise(r=>setTimeout(r,150));
     for(let i=0;i<pkg.length;i+=160){
       await ch.writeValueWithoutResponse(pkg.slice(i,i+160));await new Promise(r=>setTimeout(r,22));
-      if(i%1920===0)st.innerText=`傳送中... ${Math.round(i/pkg.length*100)}%`;
+      if(i%1920===0)st.innerText='傳送中... '+Math.round(i/pkg.length*100)+'%';
     }
     await new Promise(r=>setTimeout(r,200));await ch.writeValueWithResponse(enc.encode("END"));
     st.innerText="✅ 傳送完成！墨水屏正在刷新...";
-    setTimeout(()=>{dev.gatt.disconnect();b.disabled=false;},2000);
+    setTimeout(function(){dev.gatt.disconnect();b.disabled=false;},2000);
   }catch(e){st.innerText="❌ "+e.message;b.disabled=false;}
 }
 </script>
