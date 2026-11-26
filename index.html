@@ -255,7 +255,9 @@ if (!packedData) return;
 const btn = document.getElementById('sendBtn'); btn.disabled = true;
 try {
 statusEl.innerText = "正在搜尋 E-Ink_Frame...";
-const device = await navigator.bluetooth.requestDevice({ filters: [{ name: "E-Ink_Frame" }], optionalServices: [SERVICE_UUID] });
+const fList = new Array(1); fList.fill({ name: "E-Ink_Frame" });
+const sList = new Array(1); sList.fill(SERVICE_UUID);
+const device = await navigator.bluetooth.requestDevice({ filters: fList, optionalServices: sList });
 statusEl.innerText = "正在連接 iPhone 藍牙...";
 const server = await device.gatt.connect();
 const service = await server.getPrimaryService(SERVICE_UUID);
@@ -278,5 +280,3 @@ statusEl.innerText = "❌ 錯誤：" + err.message;
 btn.disabled = false;
 }
 }
-
-      
